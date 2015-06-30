@@ -17,7 +17,8 @@ namespace GardenConquest.Messaging {
 		public enum TYPE {
 			NOTIFICATION,
 			DIALOG,
-			SETTINGS
+			SETTINGS,
+            FLEET
 		}
 
 		/// <summary>
@@ -73,6 +74,9 @@ namespace GardenConquest.Messaging {
 				case TYPE.SETTINGS:
 					msg = new SettingsResponse();
 					break;
+                case TYPE.FLEET:
+                    msg = new FleetResponse();
+                    break;
 			}
 
 			if (msg != null)

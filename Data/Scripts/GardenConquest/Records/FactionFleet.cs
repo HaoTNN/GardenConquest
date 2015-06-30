@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 using GardenConquest.Blocks;
+using GardenConquest.Extensions;
 using GardenConquest.Core;
 
 namespace GardenConquest.Records {
@@ -14,6 +15,14 @@ namespace GardenConquest.Records {
 	/// Records the current classified fleet for a faction
 	/// </summary>
 	public class FactionFleet {
+        public struct GridData {
+            public bool supported { get; set; }
+            public long shipID { get; set; }
+            public HullClass.CLASS shipClass { get; set; }
+            public string shipName { get; set; }
+            public int blockCount { get; set; }
+        }
+
 		private long m_FactionId;
 		private uint[] m_Counts = null;
 		private uint[] m_Maximums = null;
@@ -348,6 +357,34 @@ namespace GardenConquest.Records {
 			}
 			return result;
 		}
+
+        public void serialize(VRage.ByteStream stream) {
+            stream.addUShort((ushort)TotalCount);
+            for (int i = 0; i < m_Counts.Length; ++i) {
+                if (m_Counts[i] > 0) {
+                    if (m_SupportedGrids[i].Count > 0) {
+                        foreach (KeyValuePair<long, GridEnforcer> entry in m_SupportedGrids[i])
+                            entry.Value.serialize(stream);
+                    }
+                    if (m_UnsupportedGrids[i].Count > 0) {
+                        foreach (KeyValuePair<long, GridEnforcer> entry in m_UnsupportedGrids[i])
+                            entry.Value.serialize(stream);
+                    }
+                }
+            }
+        }
+
+        public static List<GridData> deserialize(VRage.ByteStream stream) {
+            List<GridData> result = new List<GridData>();
+
+            ushort count = stream.getUShort();
+
+            for (int i = 0; i < count; ++i) {
+                GridData incomingData = GridEnforcer.deserialize(stream);
+                result.Add(incomingData);
+            }
+            return result;
+        }
 
 		public String violationsToString() {
 			log("", "violationsToString");

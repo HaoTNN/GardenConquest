@@ -1389,6 +1389,25 @@ namespace GardenConquest.Blocks {
 				m_Logger.log(level, method, message);
 		}
 
+        public void serialize(VRage.ByteStream stream) {
+            stream.WriteByte(Convert.ToByte(SupportedByFleet));
+            stream.addLong(Grid.EntityId);
+            stream.addUShort((ushort)m_EffectiveClass);
+            stream.addString(Grid.DisplayName);
+            stream.addUShort((ushort)BlockCount);
+        }
+
+        public static FactionFleet.GridData deserialize(VRage.ByteStream stream) {
+            FactionFleet.GridData result = new FactionFleet.GridData();
+
+            result.supported = Convert.ToBoolean(stream.ReadByte());
+            result.shipID = stream.getLong();
+            result.shipClass = (HullClass.CLASS)stream.getUShort();
+            result.shipName = stream.getString();
+            result.blockCount = (int)stream.getUShort();
+
+            return result;
+        }
 		#endregion
 	}
 }

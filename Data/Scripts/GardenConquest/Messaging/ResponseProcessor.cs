@@ -12,6 +12,8 @@ using VRage.Library.Utils;
 using Interfaces = Sandbox.ModAPI.Interfaces;
 using InGame = Sandbox.ModAPI.Ingame;
 
+using GardenConquest.Blocks;
+using GardenConquest.Records;
 using GardenConquest.Core;
 
 namespace GardenConquest.Messaging {
@@ -20,6 +22,9 @@ namespace GardenConquest.Messaging {
 	/// </summary>
 	public class ResponseProcessor {
 		private static Logger s_Logger = null;
+
+        private Dictionary<int, List<FactionFleet.GridData>> m_SupportedGrids;
+        private Dictionary<int, List<FactionFleet.GridData>> m_UnsupportedGrids;
 
 		private ConquestSettings.SETTINGS m_ServerSettings;
 		private bool m_Registered = false;
@@ -35,6 +40,8 @@ namespace GardenConquest.Messaging {
 				m_Registered = true;
 				MyAPIGateway.Multiplayer.RegisterMessageHandler(Constants.GCMessageId, incomming);
 			}
+            m_SupportedGrids = new Dictionary<int, List<FactionFleet.GridData>>();
+            m_UnsupportedGrids = new Dictionary<int, List<FactionFleet.GridData>>();
 		}
 
 		public void unload() {
@@ -129,6 +136,9 @@ namespace GardenConquest.Messaging {
 					case BaseResponse.TYPE.SETTINGS:
 						processSettingsResponse(msg as SettingsResponse);
 						break;
+                    case BaseResponse.TYPE.FLEET:
+                        processFleetResponse(msg as FleetResponse);
+                        break;
 				}
 			} catch (Exception e) {
 				log("Exception occured: " + e, "incomming", Logger.severity.ERROR);
@@ -158,6 +168,71 @@ namespace GardenConquest.Messaging {
 				MyAPIGateway.Session.GPS.AddLocalGps(gps);
 			}
 		}
+
+        private void processFleetResponse(FleetResponse resp) {
+            log("Loading fleet data from server", "processFleetResponse", Logger.severity.WARNING);
+            List<FactionFleet.GridData> gridData = resp.FleetData;
+
+            // Clear our current data to get fresh data from server
+            m_SupportedGrids.Clear();
+            m_UnsupportedGrids.Clear();
+
+            // Building the title
+            string fleetInfoTitle = "";
+            switch (resp.OwnerType) {
+                case GridOwner.OWNER_TYPE.FACTION:
+                    fleetInfoTitle = "Your Faction's Fleet:";
+                    break;
+                case GridOwner.OWNER_TYPE.PLAYER:
+                    fleetInfoTitle = "Your Fleet:";
+                    break;
+            }
+            string fleetInfoBody = "";
+
+            // Saving data from server to client
+            for (int i = 0; i < gridData.Count; ++i) {
+                if (gridData[i].supported) {
+                    if (!m_SupportedGrids.ContainsKey((int)gridData[i].shipClass)) {
+                        m_SupportedGrids[(int)gridData[i].shipClass] = new List<FactionFleet.GridData>();
+                    }
+                    m_SupportedGrids[(int)gridData[i].shipClass].Add(gridData[i]);
+                }
+                else {
+                    if (!m_UnsupportedGrids.ContainsKey((int)gridData[i].shipClass)) {
+                        m_UnsupportedGrids[(int)gridData[i].shipClass] = new List<FactionFleet.GridData>();
+                    }
+                    m_UnsupportedGrids[(int)gridData[i].shipClass].Add(gridData[i]);
+                }
+            }
+
+            // Go through our data to get the fleet information
+            // Consider getting the fleet information in a new function for cleaner code?
+            foreach (KeyValuePair<int, List<FactionFleet.GridData>> entry in m_SupportedGrids) {
+                fleetInfoBody += Enum.GetName(typeof(HullClass.CLASS), entry.Key) + ": " + entry.Value.Count;
+                if (resp.OwnerType == GridOwner.OWNER_TYPE.FACTION) {
+                    fleetInfoBody += " / " + ServerSettings.HullRules[entry.Key].MaxPerFaction + "\n";
+                }
+                else if (resp.OwnerType == GridOwner.OWNER_TYPE.PLAYER) {
+                    fleetInfoBody += " / " + ServerSettings.HullRules[entry.Key].MaxPerSoloPlayer + "\n";
+                }
+                else {
+                    fleetInfoBody += " / 0" + "\n";
+                }
+                for (int i = 0; i < entry.Value.Count; ++i) {
+                    fleetInfoBody += "  " + i + ". " + entry.Value[i].shipName + " - " + entry.Value[i].blockCount + " blocks\n";
+                }
+            }
+            fleetInfoBody += "\n  Unsupported:\n";
+            foreach (KeyValuePair<int, List<FactionFleet.GridData>> entry in m_UnsupportedGrids) {
+                for (int i = 0; i < entry.Value.Count; ++i) {
+                    fleetInfoBody += "     " + i + ". " + entry.Value[i].shipName + " - " + entry.Value[i].blockCount + " blocks\n";
+                }
+            }
+            fleetInfoBody += "\n";
+
+            // Displaying the fleet information
+            Utility.showDialog(fleetInfoTitle, fleetInfoBody, "Close");
+        }
 
 		#endregion
 

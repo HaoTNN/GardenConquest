@@ -94,38 +94,16 @@ namespace GardenConquest.Messaging {
 			}
 		}
 
-		private void processFleetRequest(FleetRequest req) {
-			// Get an Owner object from the player ID of the request
-			GridOwner.OWNER owner = GridOwner.ownerFromPlayerID(req.ReturnAddress);
+        private void processFleetRequest(FleetRequest req) {
+            FleetResponse resp = new FleetResponse()
+            {
+                FleetData = new List<FactionFleet.GridData>(),
+                Destination = new List<long>() { req.ReturnAddress },
+                DestType = BaseResponse.DEST_TYPE.PLAYER
+            };
 
-			// Retrieve that owner's fleet
-			FactionFleet fleet = GardenConquest.Core.StateTracker.
-				getInstance().getFleet(owner.FleetID, owner.OwnerType);
-
-			// Get the fleet's juicy description
-			String body = fleet.classesToString();
-
-			// build the title
-			String title = "";
-			switch (owner.OwnerType) {
-				case GridOwner.OWNER_TYPE.FACTION:
-					title = "Your Faction's Fleet:";
-					break;
-				case GridOwner.OWNER_TYPE.PLAYER:
-					title = "Your Fleet";
-					break;
-			}
-
-			// send the response
-			DialogResponse resp = new DialogResponse() {
-				Body = body,
-				Title = title,
-				Destination = new List<long>() { req.ReturnAddress },
-				DestType = BaseResponse.DEST_TYPE.PLAYER
-			};
-
-			send(resp);
-		}
+            send(resp);
+        }
 
 		private void processSettingsRequest(SettingsRequest req) {
 			log("", "processSettingsRequest");
