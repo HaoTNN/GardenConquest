@@ -974,6 +974,7 @@ namespace GardenConquest.Blocks {
 		public void markUnsupported(long fleetOwnerID) {
 			//m_FleetOwnerID = fleetOwnerID;
 			m_Supported = false;
+            m_CheckCleanupNextUpdate = true;
 		}
 
 		#endregion

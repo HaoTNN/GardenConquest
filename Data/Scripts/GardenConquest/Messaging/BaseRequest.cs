@@ -15,7 +15,8 @@ namespace GardenConquest.Messaging {
 		public enum TYPE {
 			FLEET,
 			VIOLATIONS,
-			SETTINGS
+			SETTINGS,
+            DISOWN
 		}
 
 		public TYPE MsgType { get; set; }
@@ -56,6 +57,9 @@ namespace GardenConquest.Messaging {
 				case TYPE.VIOLATIONS:
 					msg = new ViolationsRequest();
 					break;
+                case TYPE.DISOWN:
+                    msg = new DisownRequest();
+                    break;
 			}
 
 			if (msg != null)

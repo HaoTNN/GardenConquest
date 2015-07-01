@@ -70,6 +70,9 @@ namespace GardenConquest.Messaging {
 					case BaseRequest.TYPE.VIOLATIONS:
 						processViolationsRequest(msg as ViolationsRequest);
 						break;
+                    case BaseRequest.TYPE.DISOWN:
+                        log("Received disown request", "incomming");
+                        break;
 				}
 			} catch (Exception e) {
 				log("Exception occured: " + e, "incomming");

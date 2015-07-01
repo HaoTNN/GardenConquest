@@ -23,6 +23,7 @@ namespace GardenConquest.Messaging {
 	public class ResponseProcessor {
 		private static Logger s_Logger = null;
 
+        private uint[] m_Counts = null;
         private Dictionary<int, List<FactionFleet.GridData>> m_SupportedGrids;
         private Dictionary<int, List<FactionFleet.GridData>> m_UnsupportedGrids;
 
@@ -40,6 +41,8 @@ namespace GardenConquest.Messaging {
 				m_Registered = true;
 				MyAPIGateway.Multiplayer.RegisterMessageHandler(Constants.GCMessageId, incomming);
 			}
+            int classCount = Enum.GetValues(typeof(HullClass.CLASS)).Length;
+            m_Counts = new uint[classCount];
             m_SupportedGrids = new Dictionary<int, List<FactionFleet.GridData>>();
             m_UnsupportedGrids = new Dictionary<int, List<FactionFleet.GridData>>();
 		}
@@ -101,6 +104,34 @@ namespace GardenConquest.Messaging {
 				return false;
 			}
 		}
+
+        public bool requestDisown(string shipClass, string ID) {
+            log("Sending Disown request", "requestDisown");
+            try {
+                int classID = (int)Enum.Parse(typeof(HullClass.CLASS), shipClass.ToUpper());
+                int localID = Convert.ToInt32(ID);
+                long entityID;
+
+                //Some logic to decide whether or not the choice is a supported or unsupported grid, and its entityID
+                if (localID >= m_SupportedGrids[classID].Count) {
+                    entityID = m_UnsupportedGrids[classID][localID - m_SupportedGrids[classID].Count].shipID;
+                } else {
+                    entityID = m_SupportedGrids[classID][localID].shipID;
+                }
+                log("classID: " + classID, "requestDisown");
+                log("localID: " + localID, "requestDisown");
+                log("entityID: " + entityID, "requestDisown");
+                DisownRequest req = new DisownRequest();
+                req.ReturnAddress = MyAPIGateway.Session.Player.PlayerID;
+                req.EntityID = entityID;
+                send(req);
+                return true;
+            }
+            catch (Exception e) {
+                log("Exception occured: " + e, "requestDisown");
+                return false;
+            }
+        }
 
 		#endregion
 		#region Process Responses
@@ -174,6 +205,7 @@ namespace GardenConquest.Messaging {
             List<FactionFleet.GridData> gridData = resp.FleetData;
 
             // Clear our current data to get fresh data from server
+            Array.Clear(m_Counts, 0, m_Counts.Length);
             m_SupportedGrids.Clear();
             m_UnsupportedGrids.Clear();
 
@@ -191,44 +223,54 @@ namespace GardenConquest.Messaging {
 
             // Saving data from server to client
             for (int i = 0; i < gridData.Count; ++i) {
+                int classID = (int)gridData[i].shipClass;
+                m_Counts[classID] += 1;
                 if (gridData[i].supported) {
-                    if (!m_SupportedGrids.ContainsKey((int)gridData[i].shipClass)) {
-                        m_SupportedGrids[(int)gridData[i].shipClass] = new List<FactionFleet.GridData>();
+                    if (!m_SupportedGrids.ContainsKey(classID)) {
+                        m_SupportedGrids[classID] = new List<FactionFleet.GridData>();
                     }
-                    m_SupportedGrids[(int)gridData[i].shipClass].Add(gridData[i]);
+                    m_SupportedGrids[classID].Add(gridData[i]);
                 }
                 else {
-                    if (!m_UnsupportedGrids.ContainsKey((int)gridData[i].shipClass)) {
-                        m_UnsupportedGrids[(int)gridData[i].shipClass] = new List<FactionFleet.GridData>();
+                    if (!m_UnsupportedGrids.ContainsKey(classID)) {
+                        m_UnsupportedGrids[classID] = new List<FactionFleet.GridData>();
                     }
-                    m_UnsupportedGrids[(int)gridData[i].shipClass].Add(gridData[i]);
+                    m_UnsupportedGrids[classID].Add(gridData[i]);
                 }
             }
 
             // Go through our data to get the fleet information
             // Consider getting the fleet information in a new function for cleaner code?
-            foreach (KeyValuePair<int, List<FactionFleet.GridData>> entry in m_SupportedGrids) {
-                fleetInfoBody += Enum.GetName(typeof(HullClass.CLASS), entry.Key) + ": " + entry.Value.Count;
-                if (resp.OwnerType == GridOwner.OWNER_TYPE.FACTION) {
-                    fleetInfoBody += " / " + ServerSettings.HullRules[entry.Key].MaxPerFaction + "\n";
+            List<FactionFleet.GridData> gdList;
+            for (int i = 0; i < m_Counts.Length; ++i) {
+                if (m_Counts[i] > 0) {
+                    fleetInfoBody += (HullClass.CLASS)i + ": " + m_Counts[i] + " / ";
+                    if (resp.OwnerType == GridOwner.OWNER_TYPE.FACTION) {
+                        fleetInfoBody += ServerSettings.HullRules[i].MaxPerFaction + "\n";
+                    }
+                    else if (resp.OwnerType == GridOwner.OWNER_TYPE.PLAYER) {
+                        fleetInfoBody += ServerSettings.HullRules[i].MaxPerSoloPlayer + "\n";
+                    }
+                    else {
+                        fleetInfoBody += "0\n";
+                    }
                 }
-                else if (resp.OwnerType == GridOwner.OWNER_TYPE.PLAYER) {
-                    fleetInfoBody += " / " + ServerSettings.HullRules[entry.Key].MaxPerSoloPlayer + "\n";
+                if (m_SupportedGrids.ContainsKey(i)) {
+                    gdList = m_SupportedGrids[i];
+                    for (int j = 0; j < gdList.Count; ++j) {
+                        fleetInfoBody += "  " + j + ". " + gdList[j].shipName + " - " + gdList[j].blockCount + " blocks\n";
+                    }
                 }
-                else {
-                    fleetInfoBody += " / 0" + "\n";
+                if (m_UnsupportedGrids.ContainsKey(i)) {
+                    gdList = m_UnsupportedGrids[i];
+                    fleetInfoBody += "\n  Unsupported:\n";
+                    for (int j = 0; j < gdList.Count; ++j) {
+                        //Some code logic to continue the numbering of entries where m_SupportedGrid leaves off
+                        fleetInfoBody += "     " + (j + m_SupportedGrids[i].Count) + ". " + gdList[j].shipName + " - " + gdList[j].blockCount + " blocks\n";
+                    }
                 }
-                for (int i = 0; i < entry.Value.Count; ++i) {
-                    fleetInfoBody += "  " + i + ". " + entry.Value[i].shipName + " - " + entry.Value[i].blockCount + " blocks\n";
-                }
+                fleetInfoBody += "\n";
             }
-            fleetInfoBody += "\n  Unsupported:\n";
-            foreach (KeyValuePair<int, List<FactionFleet.GridData>> entry in m_UnsupportedGrids) {
-                for (int i = 0; i < entry.Value.Count; ++i) {
-                    fleetInfoBody += "     " + i + ". " + entry.Value[i].shipName + " - " + entry.Value[i].blockCount + " blocks\n";
-                }
-            }
-            fleetInfoBody += "\n";
 
             // Displaying the fleet information
             Utility.showDialog(fleetInfoTitle, fleetInfoBody, "Close");

@@ -116,9 +116,9 @@ namespace GardenConquest.Core {
 							} else {
 								switch (cmd[2].ToLower()) {
 									case "disown":
-										String entityID = "";
-										if (numCommands > 2)
-											entityID = cmd[3];
+                                        if (numCommands == 4) {
+                                            m_MailMan.requestDisown(cmd[3], cmd[4]);
+                                        }
 										//m_MailMan.requestDisown(cmd[3]);
 										break;
 								}
