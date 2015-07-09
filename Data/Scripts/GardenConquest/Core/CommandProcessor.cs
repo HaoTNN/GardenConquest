@@ -116,10 +116,10 @@ namespace GardenConquest.Core {
 							} else {
 								switch (cmd[2].ToLower()) {
 									case "disown":
-                                        if (numCommands == 4) {
+                                        // Disabled until the Mod API supports the ability to change owners of individual blocks
+                                        /*if (numCommands == 4) {
                                             m_MailMan.requestDisown(cmd[3], cmd[4]);
-                                        }
-										//m_MailMan.requestDisown(cmd[3]);
+                                        }*/
 										break;
 								}
 							}

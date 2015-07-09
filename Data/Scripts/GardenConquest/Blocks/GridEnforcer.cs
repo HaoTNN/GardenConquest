@@ -32,6 +32,15 @@ namespace GardenConquest.Blocks {
 	public class GridEnforcer : MyGameLogicComponent {
 
 		#region Structs and Enums
+        public struct GridData {
+            public bool supported { get; set; }
+            public long shipID { get; set; }
+            public HullClass.CLASS shipClass { get; set; }
+            public string shipName { get; set; }
+            public int blockCount { get; set; }
+            public bool displayPos { get; set; }
+            public VRageMath.Vector3D shipPosition { get; set; }
+        }
 
 		public enum VIOLATION_TYPE {
 			NONE,
@@ -1396,19 +1405,41 @@ namespace GardenConquest.Blocks {
             stream.addUShort((ushort)m_EffectiveClass);
             stream.addString(Grid.DisplayName);
             stream.addUShort((ushort)BlockCount);
+
+            // Serialize position data if the owner of the grid
+            if (Utility.canDisplayPositionTo(Grid, Owner.PlayerID)) {
+                stream.WriteByte(Convert.ToByte(true));
+                stream.addLong((long)Grid.GetPosition().X);
+                stream.addLong((long)Grid.GetPosition().Y);
+                stream.addLong((long)Grid.GetPosition().Z);
+            }
+            else {
+                stream.WriteByte(Convert.ToByte(false));
+            }
         }
 
-        public static FactionFleet.GridData deserialize(VRage.ByteStream stream) {
-            FactionFleet.GridData result = new FactionFleet.GridData();
+        public static GridData deserialize(VRage.ByteStream stream) {
+            GridData result = new GridData();
 
             result.supported = Convert.ToBoolean(stream.ReadByte());
             result.shipID = stream.getLong();
             result.shipClass = (HullClass.CLASS)stream.getUShort();
             result.shipName = stream.getString();
             result.blockCount = (int)stream.getUShort();
-
+            result.displayPos = Convert.ToBoolean(stream.ReadByte());
+            if (result.displayPos) {
+                long x, y, z;
+                x = stream.getLong();
+                y = stream.getLong();
+                z = stream.getLong();
+                result.shipPosition = new VRageMath.Vector3D(x, y, z);
+            }
+            else {
+                result.shipPosition = new VRageMath.Vector3D();
+            }
             return result;
         }
+
 		#endregion
 	}
 }

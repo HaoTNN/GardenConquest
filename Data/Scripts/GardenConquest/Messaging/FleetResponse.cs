@@ -4,13 +4,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using GardenConquest.Blocks;
 using GardenConquest.Extensions;
 using GardenConquest.Records;
 
 namespace GardenConquest.Messaging {
     public class FleetResponse : BaseResponse {
 
-        public List<FactionFleet.GridData> FleetData;
+        public List<GridEnforcer.GridData> FleetData;
         public GridOwner.OWNER_TYPE OwnerType;
 
         private const int BaseSize = HeaderSize;
@@ -39,7 +40,7 @@ namespace GardenConquest.Messaging {
         public override void deserialize(VRage.ByteStream stream) {
             base.deserialize(stream);
             OwnerType = (GridOwner.OWNER_TYPE)stream.getUShort();
-            FleetData = new List<FactionFleet.GridData>(FactionFleet.deserialize(stream));
+            FleetData = new List<GridEnforcer.GridData>(FactionFleet.deserialize(stream));
         }
 
 

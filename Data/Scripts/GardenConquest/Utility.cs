@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 using Sandbox.Common.ObjectBuilders;
 using Sandbox.ModAPI;
 
+using Interfaces = Sandbox.ModAPI.Interfaces;
+using InGame = Sandbox.ModAPI.Ingame;
+
 namespace GardenConquest {
 	/// <summary>
 	/// Static helper functions
@@ -48,6 +51,54 @@ namespace GardenConquest {
 			int end = id.IndexOf('}');
 			return id.Substring(start + 1, end - start);
 		}
+
+        /// <summary>
+        /// Is the given player allowed to see the given grid's position?
+        /// Player is able to see the position of the grid if the player
+        /// is part of the mainCockpit's faction OR the player owns the mainCockpit
+        /// </summary>
+        /// <param name="playerID"></param>
+        /// <param name="grid"></param>
+        /// <remarks>
+        /// Relatively expensive since we iterate through all blocks in grid!
+        /// </remarks>
+        /// <returns></returns>
+        public static bool canDisplayPositionTo(IMyCubeGrid grid, long playerID) {
+            bool result = false;
+            List<IMySlimBlock> fatBlocks = new List<IMySlimBlock>();
+
+            // Get only FatBlocks from the blocks list from the grid
+            Func<IMySlimBlock, bool> isFatBlock = b => b.FatBlock != null;
+            grid.GetBlocks(fatBlocks, isFatBlock);
+
+            // We'll need the faction list to compare the factions of the given player and the owners of the fatblocks in the grid
+            IMyFactionCollection factions = MyAPIGateway.Session.Factions;
+
+            // Go through and search for the main cockpit. If found, set result and break out of loop, since there should only be 1 main cockpit
+            foreach (IMySlimBlock block in fatBlocks) {
+                if (block.FatBlock is InGame.IMyShipController) {
+                    if (Interfaces.TerminalPropertyExtensions.GetValueBool(block.FatBlock as InGame.IMyTerminalBlock, "MainCockpit")) {
+                        IMyFaction blocksFaction = factions.TryGetPlayerFaction(block.FatBlock.OwnerId);
+                        // Owner of block is running solo
+                        if (blocksFaction == null) {
+                            if (block.FatBlock.OwnerId == playerID) {
+                                result = true;
+                                break;
+                            }
+                        }
+                        // Owner of block is part of a faction
+                        else {
+                            long owningFactionID = blocksFaction.FactionId;
+                            if (owningFactionID == factions.TryGetPlayerFaction(playerID).FactionId) {
+                                result = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
 
 		/// <summary>
 		/// Checks if this session is the server

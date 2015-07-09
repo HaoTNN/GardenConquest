@@ -12,6 +12,7 @@ using VRage.Library.Utils;
 using Interfaces = Sandbox.ModAPI.Interfaces;
 using InGame = Sandbox.ModAPI.Ingame;
 
+using GardenConquest.Blocks;
 using GardenConquest.Core;
 using GardenConquest.Records;
 
@@ -71,7 +72,7 @@ namespace GardenConquest.Messaging {
 						processViolationsRequest(msg as ViolationsRequest);
 						break;
                     case BaseRequest.TYPE.DISOWN:
-                        log("Received disown request", "incomming");
+                        processDisownRequest(msg as DisownRequest);
                         break;
 				}
 			} catch (Exception e) {
@@ -98,9 +99,8 @@ namespace GardenConquest.Messaging {
 		}
 
         private void processFleetRequest(FleetRequest req) {
-            FleetResponse resp = new FleetResponse()
-            {
-                FleetData = new List<FactionFleet.GridData>(),
+            FleetResponse resp = new FleetResponse() {
+                FleetData = new List<GridEnforcer.GridData>(),
                 Destination = new List<long>() { req.ReturnAddress },
                 DestType = BaseResponse.DEST_TYPE.PLAYER
             };
@@ -151,6 +151,24 @@ namespace GardenConquest.Messaging {
 
 			send(resp);
 		}
+
+        private void processDisownRequest(DisownRequest req) {
+            IMyCubeGrid gridToDisown = MyAPIGateway.Entities.GetEntityById(req.EntityID) as IMyCubeGrid;
+
+            List<IMySlimBlock> allBlocks = new List<IMySlimBlock>();
+
+            // Get only FatBlocks from the blocks list from the grid
+            Func<IMySlimBlock, bool> isFatBlock = b => b.FatBlock != null;
+            gridToDisown.GetBlocks(allBlocks, isFatBlock);
+
+            foreach (IMySlimBlock block in allBlocks) {
+                if (block.FatBlock.OwnerId == req.ReturnAddress)  {
+                        // Code to disown blocks goes here
+                    // Disabled because current Space Engineer's Mod API does not have the capability to disown individual blocks
+                    //fatBlock.ChangeOwner(0, 0);
+                }
+            }
+        }
 
 		private void log(String message, String method = null, Logger.severity level = Logger.severity.DEBUG) {
 			if (s_Logger != null)

@@ -15,14 +15,6 @@ namespace GardenConquest.Records {
 	/// Records the current classified fleet for a faction
 	/// </summary>
 	public class FactionFleet {
-        public struct GridData {
-            public bool supported { get; set; }
-            public long shipID { get; set; }
-            public HullClass.CLASS shipClass { get; set; }
-            public string shipName { get; set; }
-            public int blockCount { get; set; }
-        }
-
 		private long m_FactionId;
 		private uint[] m_Counts = null;
 		private uint[] m_Maximums = null;
@@ -374,13 +366,13 @@ namespace GardenConquest.Records {
             }
         }
 
-        public static List<GridData> deserialize(VRage.ByteStream stream) {
-            List<GridData> result = new List<GridData>();
+        public static List<GridEnforcer.GridData> deserialize(VRage.ByteStream stream) {
+            List<GridEnforcer.GridData> result = new List<GridEnforcer.GridData>();
 
             ushort count = stream.getUShort();
 
             for (int i = 0; i < count; ++i) {
-                GridData incomingData = GridEnforcer.deserialize(stream);
+                GridEnforcer.GridData incomingData = GridEnforcer.deserialize(stream);
                 result.Add(incomingData);
             }
             return result;

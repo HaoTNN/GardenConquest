@@ -24,8 +24,8 @@ namespace GardenConquest.Messaging {
 		private static Logger s_Logger = null;
 
         private uint[] m_Counts = null;
-        private Dictionary<int, List<FactionFleet.GridData>> m_SupportedGrids;
-        private Dictionary<int, List<FactionFleet.GridData>> m_UnsupportedGrids;
+        private Dictionary<int, List<GridEnforcer.GridData>> m_SupportedGrids;
+        private Dictionary<int, List<GridEnforcer.GridData>> m_UnsupportedGrids;
 
 		private ConquestSettings.SETTINGS m_ServerSettings;
 		private bool m_Registered = false;
@@ -43,8 +43,8 @@ namespace GardenConquest.Messaging {
 			}
             int classCount = Enum.GetValues(typeof(HullClass.CLASS)).Length;
             m_Counts = new uint[classCount];
-            m_SupportedGrids = new Dictionary<int, List<FactionFleet.GridData>>();
-            m_UnsupportedGrids = new Dictionary<int, List<FactionFleet.GridData>>();
+            m_SupportedGrids = new Dictionary<int, List<GridEnforcer.GridData>>();
+            m_UnsupportedGrids = new Dictionary<int, List<GridEnforcer.GridData>>();
 		}
 
 		public void unload() {
@@ -118,9 +118,6 @@ namespace GardenConquest.Messaging {
                 } else {
                     entityID = m_SupportedGrids[classID][localID].shipID;
                 }
-                log("classID: " + classID, "requestDisown");
-                log("localID: " + localID, "requestDisown");
-                log("entityID: " + entityID, "requestDisown");
                 DisownRequest req = new DisownRequest();
                 req.ReturnAddress = MyAPIGateway.Session.Player.PlayerID;
                 req.EntityID = entityID;
@@ -201,25 +198,13 @@ namespace GardenConquest.Messaging {
 		}
 
         private void processFleetResponse(FleetResponse resp) {
-            log("Loading fleet data from server", "processFleetResponse", Logger.severity.WARNING);
-            List<FactionFleet.GridData> gridData = resp.FleetData;
+            log("Loading fleet data from server", "processFleetResponse");
+            List<GridEnforcer.GridData> gridData = resp.FleetData;
 
             // Clear our current data to get fresh data from server
             Array.Clear(m_Counts, 0, m_Counts.Length);
             m_SupportedGrids.Clear();
             m_UnsupportedGrids.Clear();
-
-            // Building the title
-            string fleetInfoTitle = "";
-            switch (resp.OwnerType) {
-                case GridOwner.OWNER_TYPE.FACTION:
-                    fleetInfoTitle = "Your Faction's Fleet:";
-                    break;
-                case GridOwner.OWNER_TYPE.PLAYER:
-                    fleetInfoTitle = "Your Fleet:";
-                    break;
-            }
-            string fleetInfoBody = "";
 
             // Saving data from server to client
             for (int i = 0; i < gridData.Count; ++i) {
@@ -227,28 +212,40 @@ namespace GardenConquest.Messaging {
                 m_Counts[classID] += 1;
                 if (gridData[i].supported) {
                     if (!m_SupportedGrids.ContainsKey(classID)) {
-                        m_SupportedGrids[classID] = new List<FactionFleet.GridData>();
+                        m_SupportedGrids[classID] = new List<GridEnforcer.GridData>();
                     }
                     m_SupportedGrids[classID].Add(gridData[i]);
                 }
                 else {
                     if (!m_UnsupportedGrids.ContainsKey(classID)) {
-                        m_UnsupportedGrids[classID] = new List<FactionFleet.GridData>();
+                        m_UnsupportedGrids[classID] = new List<GridEnforcer.GridData>();
                     }
                     m_UnsupportedGrids[classID].Add(gridData[i]);
                 }
             }
 
-            // Go through our data to get the fleet information
-            // Consider getting the fleet information in a new function for cleaner code?
-            List<FactionFleet.GridData> gdList;
+            // Building fleet info to display in a dialog
+            string fleetInfoBody = buildFleetInfoBody(resp.OwnerType);
+            string fleetInfoTitle = buildFleetInfoTitle(resp.OwnerType);
+
+            // Displaying the fleet information
+            Utility.showDialog(fleetInfoTitle, fleetInfoBody, "Close");
+        }
+
+		#endregion
+        #region Process Response Utilities
+
+        private string buildFleetInfoBody(GridOwner.OWNER_TYPE ownerType) {
+            log("Building Fleet Info Body", "buildFleetInfoBody");
+            string fleetInfoBody = "";
+            List<GridEnforcer.GridData> gdList;
             for (int i = 0; i < m_Counts.Length; ++i) {
                 if (m_Counts[i] > 0) {
                     fleetInfoBody += (HullClass.CLASS)i + ": " + m_Counts[i] + " / ";
-                    if (resp.OwnerType == GridOwner.OWNER_TYPE.FACTION) {
+                    if (ownerType == GridOwner.OWNER_TYPE.FACTION) {
                         fleetInfoBody += ServerSettings.HullRules[i].MaxPerFaction + "\n";
                     }
-                    else if (resp.OwnerType == GridOwner.OWNER_TYPE.PLAYER) {
+                    else if (ownerType == GridOwner.OWNER_TYPE.PLAYER) {
                         fleetInfoBody += ServerSettings.HullRules[i].MaxPerSoloPlayer + "\n";
                     }
                     else {
@@ -259,21 +256,38 @@ namespace GardenConquest.Messaging {
                     gdList = m_SupportedGrids[i];
                     for (int j = 0; j < gdList.Count; ++j) {
                         fleetInfoBody += "  " + j + ". " + gdList[j].shipName + " - " + gdList[j].blockCount + " blocks\n";
+                        if (gdList[j].displayPos) {
+                            fleetInfoBody += "      GPS: " + gdList[j].shipPosition.X + ", " + gdList[j].shipPosition.Y + ", " + gdList[j].shipPosition.Z + "\n";
+                        }
                     }
                 }
                 if (m_UnsupportedGrids.ContainsKey(i)) {
                     gdList = m_UnsupportedGrids[i];
+                    int offset = (m_SupportedGrids.ContainsKey(i) ? m_SupportedGrids[i].Count : 0);
                     fleetInfoBody += "\n  Unsupported:\n";
                     for (int j = 0; j < gdList.Count; ++j) {
                         //Some code logic to continue the numbering of entries where m_SupportedGrid leaves off
-                        fleetInfoBody += "     " + (j + m_SupportedGrids[i].Count) + ". " + gdList[j].shipName + " - " + gdList[j].blockCount + " blocks\n";
+                        fleetInfoBody += "     " + (j + offset) + ". " + gdList[j].shipName + " - " + gdList[j].blockCount + " blocks\n";
+                        if (gdList[j].displayPos) {
+                            fleetInfoBody += "         GPS: " + gdList[j].shipPosition.X + ", " + gdList[j].shipPosition.Y + ", " + gdList[j].shipPosition.Z + "\n";
+                        }
                     }
                 }
                 fleetInfoBody += "\n";
             }
-
-            // Displaying the fleet information
-            Utility.showDialog(fleetInfoTitle, fleetInfoBody, "Close");
+            return fleetInfoBody;
+        }
+        private string buildFleetInfoTitle(GridOwner.OWNER_TYPE ownerType) {
+            string fleetInfoTitle = "";
+            switch (ownerType) {
+                case GridOwner.OWNER_TYPE.FACTION:
+                    fleetInfoTitle = "Your Faction's Fleet:";
+                    break;
+                case GridOwner.OWNER_TYPE.PLAYER:
+                    fleetInfoTitle = "Your Fleet:";
+                    break;
+            }
+            return fleetInfoTitle;
         }
 
 		#endregion
